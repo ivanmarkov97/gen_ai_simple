@@ -54,6 +54,7 @@ def train_dis_on_real_batch(
     real_batch: torch.tensor,
     device: str
   ) -> float:
+  # trains discriminator given only real data from <real_batch>
 
   batch_size = real_batch.shape[0]
   real_samples = real_batch.to(device)
@@ -78,6 +79,7 @@ def train_dis_on_fake_batch(
     batch_size: int,
     device: str
 ) -> float:
+  # trains discriminator given only real data from <fake_creator> ~ generator.
 
   noize = torch.rand((batch_size, 2))
   noize = noize.to(device)
@@ -105,6 +107,7 @@ def train_gen(
     batch_size: int,
     device: str
 ) -> float:
+  # trains generator on discriminator fake detections
 
   noize = torch.rand((batch_size, 2))
   noize = noize.to(device)
@@ -124,6 +127,7 @@ def train_gen(
 
 # USING GENERATOR
 def generate(model: nn.Module, batch_size: int, device: str) -> torch.tensor:
+  # generate fake data by generator in inference mode.
   with torch.no_grad():
     noize = torch.rand((batch_size, 2))
     noize = noize.to(device)
@@ -141,6 +145,7 @@ def train_epoch(
     gen_opt: torch.optim.Optimizer,
     device: str
 ) -> t.Tuple[float, float]:
+  # trains one epoch for discrimiator and generator
 
   dis_epoch_loss = 0
   gen_epoch_loss = 0
@@ -180,72 +185,74 @@ def train_epoch(
 
 
 def get_observed_data(n_dots: int, start: float, end: float) -> torch.tesnor:
-	observed_data = torch.zeros((n_dots, 2))
-	observed_data[:, 0] = torch.arange(start, end, step=(end - start) / n_dots)
-	observed_data[:, 1] = torch.sin(observed_data[:, 0])
-	return observed_data
+  observed_data = torch.zeros((n_dots, 2))
+  observed_data[:, 0] = torch.arange(start, end, step=(end - start) / n_dots)
+  observed_data[:, 1] = torch.sin(observed_data[:, 0])
+  return observed_data
 
 
 if __name__ == '__main__':
 
-	N_DOTS = 2000
-	START_V, END_V = 0., 10.
+  N_DOTS = 2000
+  START_V, END_V = 0., 10.
 
-	observed_data = get_observed_data(N_DOTS, START_V, END_V)
+  observed_data = get_observed_data(N_DOTS, START_V, END_V)
 
-	loader = DataLoader(observed_data, batch_size=128, shuffle=True)
-	device = select_device()
-	loss_function = nn.BCELoss().to(device)
-	gen = create_generator().to(device)
-	dis = create_discriminator().to(device)
+  loader = DataLoader(observed_data, batch_size=128, shuffle=True)
+  device = select_device()
+  loss_function = nn.BCELoss().to(device)
+  gen = create_generator().to(device)
+  dis = create_discriminator().to(device)
 
-	gen_optimizer = torch.optim.Adam(gen.parameters(), lr=0.001)
-	dis_optimizer = torch.optim.Adam(dis.parameters(), lr=0.001)
+  gen_optimizer = torch.optim.Adam(gen.parameters(), lr=0.001)
+  dis_optimizer = torch.optim.Adam(dis.parameters(), lr=0.001)
 
-	# train all
-	dis_losses = []
-	gen_losses = []
+  dis_losses = []
+  gen_losses = []
 
-	for e in range(2_000):
+  # training loop with every 100 epoch visialization
+  for e in range(2_000):
 
-	  dis_epoch_loss, gen_epoch_loss = train_epoch(
-	      dis=dis,
-	      gen=gen,
-	      loader=loader,
-	      loss_fn=loss_function,
-	      dis_opt=dis_optimizer,
-	      gen_opt=gen_optimizer,
-	      device=device
-	  )
+    dis_epoch_loss, gen_epoch_loss = train_epoch(
+        dis=dis,
+        gen=gen,
+        loader=loader,
+        loss_fn=loss_function,
+        dis_opt=dis_optimizer,
+        gen_opt=gen_optimizer,
+        device=device
+    )
 
-	  dis_losses.append(dis_epoch_loss)
-	  gen_losses.append(gen_epoch_loss)
+    dis_losses.append(dis_epoch_loss)
+    gen_losses.append(gen_epoch_loss)
 
-	  if e % 100 == 0:
-	    print('Dis loss', dis_epoch_loss, '\t', 'Gen loss', gen_epoch_loss)
-	    generated_data = generate(model=gen, batch_size=100, device=device)
-	    generated_data = generated_data.numpy()
+    if e % 100 == 0:
+      print('Dis loss', dis_epoch_loss, '\t', 'Gen loss', gen_epoch_loss)
+      generated_data = generate(model=gen, batch_size=100, device=device)
+      generated_data = generated_data.numpy()
 
-	    fig, axes = plt.subplots(1, 2, figsize=(10, 3))
-	    axes[0].scatter(observed_data[:, 0], observed_data[:, 1], label='Obs')
-	    axes[0].scatter(generated_data[:, 0], generated_data[:, 1], label='Gen')
-	    axes[0].grid(True)
-	    axes[0].legend()
+      fig, axes = plt.subplots(1, 2, figsize=(10, 3))
+      axes[0].scatter(observed_data[:, 0], observed_data[:, 1], label='Obs')
+      axes[0].scatter(generated_data[:, 0], generated_data[:, 1], label='Gen')
+      axes[0].grid(True)
+      axes[0].legend()
 
-	    plot_x = list(range(e + 1))
-	    axes[1].plot(plot_x, dis_losses, label='Dis losses')
-	    axes[1].plot(plot_x, gen_losses, label='Gen losses')
-	    axes[1].grid(True)
-	    axes[1].legend()
+      plot_x = list(range(e + 1))
+      axes[1].plot(plot_x, dis_losses, label='Dis losses')
+      axes[1].plot(plot_x, gen_losses, label='Gen losses')
+      axes[1].grid(True)
+      axes[1].legend()
 
-	    plt.show()
+      plt.show()
 
-	dis_traced = torch.jit.trace(func=dis, example_inputs=torch.rand((2, 2)))
-	gen_traced = torch.jit.trace(func=gen, example_inputs=torch.rand((2, 2)))
+  # saving model into traced-models
+  dis_traced = torch.jit.trace(func=dis, example_inputs=torch.rand((2, 2)))
+  gen_traced = torch.jit.trace(func=gen, example_inputs=torch.rand((2, 2)))
 
-	dis_traced.save('discriminator_traced.pt')
-	gen_traced.save('generator_traced.pt')
+  dis_traced.save('discriminator_traced.pt')
+  gen_traced.save('generator_traced.pt')
 
-	gen_traced = torch.jit.load('generator_traced.pt', map_location=device)
-	generated_data = generate(model=gen_traced, batch_size=1000, device=device)
-	generated_data = generated_data.numpy()
+  # ready to use for generation
+  gen_traced = torch.jit.load('generator_traced.pt', map_location=device)
+  generated_data = generate(model=gen_traced, batch_size=1000, device=device)
+  generated_data = generated_data.numpy()
