@@ -79,7 +79,7 @@ def train_dis_on_fake_batch(
     batch_size: int,
     device: str
 ) -> float:
-  # trains discriminator given only real data from <fake_creator> ~ generator.
+  # trains discriminator given only fake data from <fake_creator> ~ generator.
 
   noize = torch.rand((batch_size, 2))
   noize = noize.to(device)
